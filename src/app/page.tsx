@@ -1,50 +1,100 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 
-export default function BubbleShooter() {
-  const [bubbles, setBubbles] = useState([]);
-  const [score, setScore] = useState(0);
+export default function Page() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [score, setScore] = useState({ me: 0, ai: 0 });
 
-  // Spawn bubbles every 1.5 seconds
   useEffect(() => {
-    const interval = setInterval(() => {
-      const id = Date.now();
-      const x = Math.random() * 80 + 10; // between 10% and 90%
-      const y = Math.random() * 60 + 20; // between 20% and 80%
-      setBubbles((prev) => [...prev, { id, x, y }]);
-    }, 1500);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-    return () => clearInterval(interval);
-  }, []);
+    canvas.width = 600;
+    canvas.height = 400;
 
-  const popBubble = (id) => {
-    setBubbles((prev) => prev.filter((b) => b.id !== id));
-    setScore((s) => s + 1);
-  };
+    let ball = { x: 300, y: 200, r: 12, vx: 3, vy: 2 };
+    let paddleMe = { x: 300, y: 380, w: 100, h: 10 };
+    let paddleAi = { x: 300, y: 20, w: 100, h: 10 };
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // background
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // paddles
+      ctx.fillStyle = "#0ea5a4";
+      ctx.fillRect(paddleMe.x - paddleMe.w / 2, paddleMe.y, paddleMe.w, paddleMe.h);
+      ctx.fillStyle = "#ef4444";
+      ctx.fillRect(paddleAi.x - paddleAi.w / 2, paddleAi.y, paddleAi.w, paddleAi.h);
+
+      // ball
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+      ctx.fillStyle = "#f59e0b";
+      ctx.fill();
+      ctx.closePath();
+
+      // score
+      ctx.fillStyle = "#111";
+      ctx.font = "16px sans-serif";
+      ctx.fillText(`You: ${score.me}`, 10, 390);
+      ctx.fillText(`AI: ${score.ai}`, 520, 20);
+    };
+
+    const update = () => {
+      ball.x += ball.vx;
+      ball.y += ball.vy;
+
+      // wall bounce
+      if (ball.x - ball.r < 0 || ball.x + ball.r > canvas.width) {
+        ball.vx *= -1;
+      }
+
+      // paddle collisions
+      if (
+        ball.y + ball.r > paddleMe.y &&
+        ball.x > paddleMe.x - paddleMe.w / 2 &&
+        ball.x < paddleMe.x + paddleMe.w / 2
+      ) {
+        ball.vy *= -1;
+      }
+      if (
+        ball.y - ball.r < paddleAi.y + paddleAi.h &&
+        ball.x > paddleAi.x - paddleAi.w / 2 &&
+        ball.x < paddleAi.x + paddleAi.w / 2
+      ) {
+        ball.vy *= -1;
+      }
+
+      // scoring
+      if (ball.y - ball.r < 0) {
+        setScore((s) => ({ ...s, me: s.me + 1 }));
+        ball = { x: 300, y: 200, r: 12, vx: 3, vy: 2 };
+      }
+      if (ball.y + ball.r > canvas.height) {
+        setScore((s) => ({ ...s, ai: s.ai + 1 }));
+        ball = { x: 300, y: 200, r: 12, vx: 3, vy: -2 };
+      }
+    };
+
+    const loop = () => {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    };
+    loop();
+  }, [score]);
 
   return (
-    <main className="relative min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-sky-100 to-indigo-200 overflow-hidden">
-      {/* Scoreboard */}
-      <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-white px-6 py-2 rounded-full shadow-lg text-lg font-bold text-indigo-600">
-        Score: {score}
-      </div>
-
-      {/* Game Area */}
-      <div className="relative w-full h-screen">
-        {bubbles.map((bubble) => (
-          <button
-            key={bubble.id}
-            onClick={() => popBubble(bubble.id)}
-            className="absolute w-16 h-16 rounded-full bg-gradient-to-br from-pink-400 to-red-500 shadow-lg cursor-pointer animate-bounce"
-            style={{
-              left: `${bubble.x}%`,
-              top: `${bubble.y}%`,
-              transform: "translate(-50%, -50%)",
-            }}
-          />
-        ))}
-      </div>
+    <main className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-6">
+      <h1 className="text-2xl font-bold mb-4">Simple Volleyball Game</h1>
+      <canvas ref={canvasRef} className="border rounded-lg shadow-md" />
+      <p className="text-sm text-gray-600 mt-2">Use mouse to move paddle (AI auto plays)</p>
     </main>
   );
 }
